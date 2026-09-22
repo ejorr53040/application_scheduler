@@ -1,0 +1,16 @@
+{
+  "languages": ["python", "java", "c++", "c", "sql", "opengl", "pytorch", "flask", "react", "rust"],
+  "domain_keywords": [
+    "backend", "full stack", "full-stack", "software engineer", "software engineering",
+    "software development", "platform", "infrastructure", "systems", "distributed",
+    "database", "graphics", "game", "engine", "cloud", "api", "web"
+  ],
+  "ai_ml_keywords": ["machine learning", "artificial intelligence", "ai", "data science", "llm", "model"],
+  "home_state_codes": ["VT", "NH", "MA", "ME", "CT", "RI", "NY"],
+  "home_city_hint": "burlington, vt",
+  "exclude_categories": ["Quantitative Finance", "Product Management", "Hardware Engineering"],
+  "exclude_advanced_degree": true,
+  "needs_sponsorship": null,
+  "is_us_citizen": null,
+  "max_per_company": 2
+}

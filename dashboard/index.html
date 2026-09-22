@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>internship-hunt dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --bg: #1e1e1e;
+    --bg-panel: #252526;
+    --bg-inset: #17181a;
+    --border: #3a3a3c;
+    --text: #d4d4d4;
+    --text-dim: #8a8a8e;
+    --accent: #ff8a3d;
+    --accent-dim: #b5602a;
+    --green: #4ec9a0;
+    --yellow: #dcdcaa;
+    --red: #f14c4c;
+    --blue: #6ab7ff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "SF Mono", "Menlo", "Consolas", "Liberation Mono", monospace;
+    font-size: 13px;
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+  }
+  #sidebar {
+    width: 380px;
+    min-width: 280px;
+    background: var(--bg-panel);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+  }
+  #sidebar-header {
+    padding: 14px 16px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  #sidebar-header .title {
+    color: var(--accent);
+    font-weight: 700;
+    font-size: 14px;
+  }
+  #sidebar-header .sub {
+    color: var(--text-dim);
+    font-size: 11px;
+    margin-top: 4px;
+  }
+  #filters {
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .filter-btn {
+    background: var(--bg-inset);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 3px 9px;
+    border-radius: 4px;
+    font-size: 11px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .filter-btn.active {
+    color: var(--accent);
+    border-color: var(--accent-dim);
+  }
+  #list {
+    flex: 1;
+    overflow-y: auto;
+  }
+  .card {
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+  }
+  .card:hover { background: rgba(255,255,255,0.03); }
+  .card.selected { background: rgba(255,138,61,0.08); border-left: 2px solid var(--accent); }
+  .card .row1 {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  .card .rank { color: var(--text-dim); font-size: 11px; margin-right: 6px; }
+  .card .company { color: #fff; font-weight: 600; }
+  .card .score { color: var(--green); font-size: 11px; }
+  .card .role { color: var(--text-dim); font-size: 11px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .card .loc { color: var(--text-dim); font-size: 10px; margin-top: 1px; }
+  .stage-pill {
+    display: inline-block;
+    margin-top: 5px;
+    font-size: 10px;
+    padding: 1px 7px;
+    border-radius: 3px;
+    border: 1px solid var(--border);
+  }
+  .stage-0 { color: var(--text-dim); }
+  .stage-1, .stage-2, .stage-3 { color: var(--yellow); border-color: #6b6a4a; }
+  .stage-4 { color: var(--accent); border-color: var(--accent-dim); }
+  .stage-5, .stage-6 { color: var(--blue); border-color: #2f4f6b; }
+  .stage-7 { color: var(--green); border-color: #2f6b57; }
+  .stage--1 { color: var(--red); border-color: #6b2f2f; }
+
+  #main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  #main-header {
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-panel);
+  }
+  #main-header h1 {
+    margin: 0;
+    font-size: 17px;
+    color: #fff;
+  }
+  #main-header .meta {
+    color: var(--text-dim);
+    font-size: 12px;
+    margin-top: 6px;
+  }
+  #main-header .meta span { margin-right: 14px; }
+  #progress-track {
+    display: flex;
+    margin-top: 12px;
+    gap: 4px;
+  }
+  .step {
+    flex: 1;
+    text-align: center;
+    font-size: 10px;
+    padding: 4px 2px;
+    border-radius: 3px;
+    background: var(--bg-inset);
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+  }
+  .step.done { color: var(--accent); border-color: var(--accent-dim); background: rgba(255,138,61,0.08); }
+  .step.current { color: #fff; border-color: var(--accent); }
+
+  #tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-panel);
+    padding: 0 24px;
+  }
+  .tab {
+    padding: 9px 14px;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 12px;
+    border-bottom: 2px solid transparent;
+  }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab .dot { color: var(--green); margin-left: 4px; }
+
+  #content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 24px;
+  }
+  .why-box {
+    background: var(--bg-inset);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    padding: 10px 14px;
+    border-radius: 4px;
+    margin-bottom: 16px;
+    color: var(--text);
+  }
+  .why-box .label { color: var(--accent); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+  .flags { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
+  .flag {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+  }
+  .flag.warn { color: var(--red); border-color: #6b2f2f; }
+  .flag.good { color: var(--green); border-color: #2f6b57; }
+
+  pre.file-view {
+    background: var(--bg-inset);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px 18px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: var(--text);
+    line-height: 1.55;
+    font-size: 12.5px;
+  }
+  .empty-state {
+    color: var(--text-dim);
+    padding: 40px;
+    text-align: center;
+  }
+  a { color: var(--blue); }
+  #leads { margin-bottom: 16px; }
+  #leads .lead { font-size: 12px; color: var(--text-dim); padding: 4px 0; }
+
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: #444; border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<div id="sidebar">
+  <div id="sidebar-header">
+    <div class="title">$ internship-hunt --dashboard</div>
+    <div class="sub" id="header-sub">loading...</div>
+  </div>
+  <div id="filters">
+    <button class="filter-btn active" data-filter="all">all</button>
+    <button class="filter-btn" data-filter="packet">has packet</button>
+    <button class="filter-btn" data-filter="applied">applied+</button>
+    <button class="filter-btn" data-filter="ne">new england</button>
+  </div>
+  <div id="list"></div>
+</div>
+
+<div id="main">
+  <div id="main-header">
+    <h1 id="mh-title">Select an application</h1>
+    <div class="meta" id="mh-meta"></div>
+    <div id="progress-track"></div>
+  </div>
+  <div id="tabs"></div>
+  <div id="content"><div class="empty-state">Pick a company on the left to see its posting, resume, cover letter, and answers.</div></div>
+</div>
+
+<script>
+let DATA = null;
+let selected = null;
+let activeFilter = "all";
+let activeTab = null;
+
+const STEP_ORDER = [
+  {stage: 0, label: "Shortlisted"},
+  {stage: 1, label: "Researched"},
+  {stage: 2, label: "Resume"},
+  {stage: 3, label: "Cover Ltr"},
+  {stage: 4, label: "Packet Ready"},
+  {stage: 5, label: "Applied"},
+  {stage: 6, label: "Interview"},
+  {stage: 7, label: "Offer"},
+];
+
+const FILE_LABELS = {
+  "posting.md": "Posting",
+  "posting.json": "Posting",
+  "resume.md": "Resume",
+  "cover_letter.md": "Cover Letter",
+  "answers.md": "Answers",
+  "contacts.md": "Contacts",
+};
+const FILE_ORDER = ["posting.md", "posting.json", "resume.md", "cover_letter.md", "answers.md", "contacts.md"];
+
+async function load() {
+  const res = await fetch("data.json?_=" + Date.now());
+  DATA = await res.json();
+  document.getElementById("header-sub").textContent =
+    `${DATA.entries.length} roles - scanned ${DATA.total_open_roles_scanned} open postings - ${DATA.generated_on}`;
+  renderList();
+  if (DATA.entries.length) selectEntry(DATA.entries[0].rank);
+}
+
+function matchesFilter(e) {
+  if (activeFilter === "all") return true;
+  if (activeFilter === "packet") return e.has_packet;
+  if (activeFilter === "applied") return e.stage >= 5;
+  if (activeFilter === "ne") return /VT|NH|MA|ME|CT|RI|NY/.test(e.location);
+  return true;
+}
+
+function renderList() {
+  const list = document.getElementById("list");
+  list.innerHTML = "";
+  DATA.entries.filter(matchesFilter).forEach(e => {
+    const div = document.createElement("div");
+    div.className = "card" + (selected === e.rank ? " selected" : "");
+    div.onclick = () => selectEntry(e.rank);
+    div.innerHTML = `
+      <div class="row1">
+        <div><span class="rank">#${e.rank}</span><span class="company">${escapeHtml(e.company)}</span></div>
+        <div class="score">${e.match_score}</div>
+      </div>
+      <div class="role">${escapeHtml(e.role)}</div>
+      <div class="loc">${escapeHtml(e.location)}</div>
+      <div class="stage-pill stage-${e.stage}">${e.stage_label}</div>
+    `;
+    list.appendChild(div);
+  });
+}
+
+function selectEntry(rank) {
+  selected = rank;
+  const e = DATA.entries.find(x => x.rank === rank);
+  renderList();
+  renderMain(e);
+}
+
+function renderMain(e) {
+  document.getElementById("mh-title").textContent = `#${e.rank} · ${e.company} — ${e.role}`;
+  document.getElementById("mh-meta").innerHTML =
+    `<span>📍 ${escapeHtml(e.location)}</span><span>category: ${escapeHtml(e.category)}</span><span>match score: ${e.match_score}</span><span><a href="${e.apply_url}" target="_blank">apply link ↗</a></span>`;
+
+  const track = document.getElementById("progress-track");
+  track.innerHTML = "";
+  const currentIdx = STEP_ORDER.findIndex(s => s.stage === e.stage);
+  STEP_ORDER.forEach((s, i) => {
+    const div = document.createElement("div");
+    let cls = "step";
+    if (e.stage === -1) {
+      cls += i === 0 ? " done" : "";
+    } else if (i < currentIdx) cls += " done";
+    else if (i === currentIdx) cls += " current";
+    div.className = cls;
+    div.textContent = s.label;
+    track.appendChild(div);
+  });
+  if (e.stage === -1) {
+    const div = document.createElement("div");
+    div.className = "step current";
+    div.style.color = "var(--red)";
+    div.textContent = "Rejected";
+    track.appendChild(div);
+  }
+
+  const availableFiles = FILE_ORDER.filter(f => e.files[f] !== undefined);
+  const tabs = document.getElementById("tabs");
+  tabs.innerHTML = "";
+  const overviewTab = makeTab("overview", "Overview", true);
+  tabs.appendChild(overviewTab);
+  availableFiles.forEach(f => tabs.appendChild(makeTab(f, FILE_LABELS[f] || f, false)));
+
+  activeTab = "overview";
+  renderContent(e);
+
+  tabs.querySelectorAll(".tab").forEach(t => {
+    t.onclick = () => {
+      activeTab = t.dataset.key;
+      tabs.querySelectorAll(".tab").forEach(x => x.classList.remove("active"));
+      t.classList.add("active");
+      renderContent(e);
+    };
+  });
+}
+
+function makeTab(key, label, active) {
+  const div = document.createElement("div");
+  div.className = "tab" + (active ? " active" : "");
+  div.dataset.key = key;
+  div.textContent = label;
+  return div;
+}
+
+function renderContent(e) {
+  const content = document.getElementById("content");
+  if (activeTab === "overview") {
+    let flagsHtml = "";
+    if (e.flags.no_sponsorship) flagsHtml += `<span class="flag warn">no sponsorship</span>`;
+    if (e.flags.us_citizen_required) flagsHtml += `<span class="flag warn">US citizen required</span>`;
+    if (e.flags.faang_plus) flagsHtml += `<span class="flag good">FAANG+</span>`;
+    if (!e.has_packet) flagsHtml += `<span class="flag">no packet built yet</span>`;
+
+    let leadsHtml = "";
+    if (e.linkedin_leads && e.linkedin_leads.length) {
+      leadsHtml = `<div id="leads"><div class="why-box"><div class="label">Possible LinkedIn contacts (unverified, publicly indexed)</div>` +
+        e.linkedin_leads.map(l => `<div class="lead">• ${escapeHtml(l)}</div>`).join("") +
+        `</div></div>`;
+    }
+
+    content.innerHTML = `
+      <div class="flags">${flagsHtml}</div>
+      <div class="why-box">
+        <div class="label">Why it fits</div>
+        ${escapeHtml(e.why_it_fits)}
+      </div>
+      ${leadsHtml}
+      <div class="why-box" style="border-left-color: var(--text-dim);">
+        <div class="label" style="color: var(--text-dim);">Notes</div>
+        ${e.notes ? escapeHtml(e.notes) : '<span style="color: var(--text-dim)">— none yet —</span>'}
+      </div>
+    `;
+  } else {
+    const raw = e.files[activeTab];
+    let display = raw;
+    if (activeTab === "posting.json") {
+      try { display = JSON.stringify(JSON.parse(raw), null, 2); } catch (err) {}
+    }
+    content.innerHTML = `<pre class="file-view">${escapeHtml(display || "(empty)")}</pre>`;
+  }
+}
+
+function escapeHtml(s) {
+  if (s === undefined || s === null) return "";
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+document.querySelectorAll(".filter-btn").forEach(btn => {
+  btn.onclick = () => {
+    activeFilter = btn.dataset.filter;
+    document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    renderList();
+  };
+});
+
+load();
+</script>
+</body>
+</html>
