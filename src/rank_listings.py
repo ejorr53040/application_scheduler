@@ -20,6 +20,8 @@ profile.json shape (see ../docs/profile_schema.md for full details):
 """
 import argparse
 import json
+import re
+import sys
 from collections import defaultdict
 
 DEFAULT_GOOD_DOMAIN = [
@@ -54,7 +56,10 @@ def score_entry(row, profile):
             break
 
     languages = [l.lower() for l in profile.get("languages", [])]
-    lang_hits = [l for l in languages if l in role_l]
+    # Word-boundary match, not substring - a naive "in" check makes a
+    # single-letter language like "c" match inside "Engineer" or "Science"
+    # and every role scores an irrelevant "language" hit.
+    lang_hits = [l for l in languages if re.search(r"(?<![a-z0-9+#])" + re.escape(l) + r"(?![a-z0-9+#])", role_l)]
     if lang_hits:
         s += 2
         reasons.append(f"posting calls out {', '.join(lang_hits)}, which is on the resume")
@@ -95,7 +100,64 @@ def score_entry(row, profile):
             s -= 100
             reasons = [f"EXCLUDED: {sponsor_flag} conflicts with candidate's stated status"]
 
+    for reason in row.get("_campus_visit_reasons", []):
+        s += 3
+        reasons.append(reason)
+
     return s, reasons
+
+
+def _names_match(a_l, b_l):
+    """Word-boundary containment, not raw substring - otherwise e.g. company
+    "Tive" false-matches inside organization "Marsh Captive Solutions"."""
+    return bool(
+        re.search(r"\b" + re.escape(a_l) + r"\b", b_l)
+        or re.search(r"\b" + re.escape(b_l) + r"\b", a_l)
+    )
+
+
+def apply_career_fair_signal(rows, fair_data):
+    """Merge career-fair/campus-visit signal (from fetch_career_fair_events.py)
+    into the listing set before scoring: boost companies that already have a
+    scraped posting, and synthesize a placeholder entry for organizations
+    confirmed to be visiting campus that don't have one yet - so "this company
+    is recruiting on your campus right now" surfaces as its own lead even when
+    no specific role posting was found for it."""
+    rows = [dict(r) for r in rows]
+    visits = fair_data.get("organization_visits", [])
+
+    for visit in visits:
+        org = visit.get("organization")
+        if not org:
+            continue
+        org_l = org.lower()
+        reason = f'confirmed on UVM campus: "{visit["title"]}" ({visit["date"]})'
+
+        matched = False
+        for r in rows:
+            company_l = (r.get("company") or "").lower()
+            if _names_match(org_l, company_l):
+                r.setdefault("_campus_visit_reasons", []).append(reason)
+                matched = True
+
+        if not matched:
+            rows.append({
+                "source": "UVM Career Center calendar",
+                "category": "Campus Recruiting Event",
+                "company": org,
+                "role": "(No specific posting found yet - confirmed recruiting/visiting at UVM; check their careers page directly)",
+                "location": "Burlington, VT (UVM campus event)",
+                "apply_url": visit.get("url"),
+                "age": visit.get("date"),
+                "closed": False,
+                "no_sponsorship": False,
+                "us_citizen_required": False,
+                "advanced_degree": False,
+                "faang_plus": False,
+                "_campus_visit_reasons": [reason],
+            })
+
+    return rows
 
 
 def dedupe(rows):
@@ -183,12 +245,28 @@ def main():
     p.add_argument("--profile", required=True, help="Path to candidate profile JSON")
     p.add_argument("--out", default="shortlist.json")
     p.add_argument("--top", type=int, default=50)
+    p.add_argument("--career-fair-events", default=None,
+                   help="Path to fetch_career_fair_events.py output - merges campus-visit signal in before ranking")
     args = p.parse_args()
 
     with open(args.listings, encoding="utf-8") as f:
         listings = json.load(f)
     with open(args.profile, encoding="utf-8") as f:
         profile = json.load(f)
+
+    if args.career_fair_events:
+        try:
+            with open(args.career_fair_events, encoding="utf-8") as f:
+                fair_data = json.load(f)
+        except FileNotFoundError:
+            print(
+                f"Note: {args.career_fair_events} not found - ranking without campus-visit signal "
+                f"(run fetch_career_fair_events.py first to include it)",
+                file=sys.stderr,
+            )
+            fair_data = None
+        if fair_data:
+            listings = apply_career_fair_signal(listings, fair_data)
 
     shortlist = build_shortlist(listings, profile, top_n=args.top)
 

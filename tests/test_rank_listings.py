@@ -43,6 +43,18 @@ class TestScoreEntry(unittest.TestCase):
         s_no, _ = rl.score_entry(non_matching, PROFILE)
         self.assertGreater(s_match, s_no)
 
+    def test_single_letter_language_does_not_match_as_substring(self):
+        profile = dict(PROFILE, languages=["c"])
+        row = make_row(role="Software Engineer Intern")  # contains no standalone "c" token
+        _, reasons = rl.score_entry(row, profile)
+        self.assertFalse(any("calls out c" in r for r in reasons))
+
+    def test_single_letter_language_matches_as_whole_word(self):
+        profile = dict(PROFILE, languages=["c"])
+        row = make_row(role="Embedded C Intern")
+        _, reasons = rl.score_entry(row, profile)
+        self.assertTrue(any("calls out c" in r for r in reasons))
+
     def test_home_location_boosts_score(self):
         home = make_row(location="Burlington, VT")
         away = make_row(location="San Francisco, CA")
@@ -88,6 +100,48 @@ class TestCollapseMultiLocationDupes(unittest.TestCase):
         collapsed = rl.collapse_multi_location_dupes(rows)
         self.assertEqual(len(collapsed), 1)
         self.assertIn("2 locations", collapsed[0]["location"])
+
+
+class TestApplyCareerFairSignal(unittest.TestCase):
+    def test_boosts_existing_company_match(self):
+        rows = [make_row(company="Acme Corp")]
+        fair_data = {"organization_visits": [
+            {"organization": "Acme Corp", "title": "Network with Acme Corp", "date": "2026-10-01", "url": "https://x"},
+        ]}
+        merged = rl.apply_career_fair_signal(rows, fair_data)
+        self.assertEqual(len(merged), 1)
+        self.assertIn("_campus_visit_reasons", merged[0])
+
+    def test_does_not_false_match_substring_inside_longer_name(self):
+        rows = [make_row(company="Tive")]
+        fair_data = {"organization_visits": [
+            {"organization": "Marsh Captive Solutions", "title": "Network with Marsh Captive Solutions",
+             "date": "2026-10-01", "url": "https://x"},
+        ]}
+        merged = rl.apply_career_fair_signal(rows, fair_data)
+        # "Tive" should NOT match inside "Marsh CapTIVE Solutions" - so it stays
+        # unmatched (no boost) and a separate synthetic entry is added for the real org.
+        self.assertNotIn("_campus_visit_reasons", merged[0])
+        self.assertEqual(len(merged), 2)
+
+    def test_adds_synthetic_entry_when_no_match(self):
+        rows = [make_row(company="Acme Corp")]
+        fair_data = {"organization_visits": [
+            {"organization": "Nobody Yet Inc", "title": "Network with Nobody Yet Inc", "date": "2026-10-01", "url": "https://x"},
+        ]}
+        merged = rl.apply_career_fair_signal(rows, fair_data)
+        self.assertEqual(len(merged), 2)
+        new_row = next(r for r in merged if r["company"] == "Nobody Yet Inc")
+        self.assertEqual(new_row["category"], "Campus Recruiting Event")
+        self.assertFalse(new_row["closed"])
+
+    def test_campus_visit_boosts_score(self):
+        row = make_row(role="Product Marketing Intern")  # otherwise weak match
+        row_with_visit = dict(row, _campus_visit_reasons=['confirmed on UVM campus: "X" (2026-10-01)'])
+        score_plain, _ = rl.score_entry(row, PROFILE)
+        score_visit, reasons_visit = rl.score_entry(row_with_visit, PROFILE)
+        self.assertGreater(score_visit, score_plain)
+        self.assertTrue(any("confirmed on UVM campus" in r for r in reasons_visit))
 
 
 class TestBuildShortlist(unittest.TestCase):

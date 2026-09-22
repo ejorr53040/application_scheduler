@@ -15,6 +15,10 @@
 | `is_us_citizen` | bool or `null` | Set `true` if you are NOT a US citizen and the role requires one, to hard-exclude 🇺🇸-flagged roles. Leave `null`/omit to not filter on this. |
 | `max_per_company` | int | Cap on how many roles from the same company appear in the final shortlist (default 2), so one company with many postings doesn't crowd out variety. |
 
+## Campus-visit scoring (no profile field needed)
+
+When `rank_listings.py` is run with `--career-fair-events`, any listing matched to a confirmed UVM campus visit gets a flat +3 bonus per matching event, on top of whatever else it scored - this isn't configurable per-profile since "a company is confirmed to be actively recruiting at your school right now" is a strong signal regardless of what else is in your profile. See the main README's "Career-fair / campus-visit signal" section.
+
 ## Why this exists
 
 The scoring in `score_entry()` is a **coarse pre-filter**, meant to cut ~2,000 raw listings down to a manageable candidate set cheaply. It is not the final word on fit - the `cs-internship-hunt` Claude Code skill runs a much more rigorous "hiring-manager council" adversarial review (see that skill's `SKILL.md`, Step 4) on whatever survives this filter, which is where hard-to-encode judgment calls (does the resume's evidence actually support this specific posting, are there eligibility landmines buried in the real posting text, etc.) happen. Don't expect `match_score` alone to be a trustworthy final ranking - treat it as "worth a closer look," not "apply here first."
